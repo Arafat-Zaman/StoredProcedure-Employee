@@ -1,0 +1,59 @@
+-- Creating the stored procedure to update employee salary
+CREATE PROCEDURE UpdateEmployeeSalary
+    @EmployeeID INT,                     -- Input parameter for Employee ID
+    @NewSalary DECIMAL(10, 2),           -- Input parameter for new salary
+    @SuccessMessage NVARCHAR(100) OUTPUT  -- Output parameter for success/failure message
+AS
+BEGIN
+    -- Declare variables for transaction management
+    DECLARE @OldSalary DECIMAL(10, 2);
+    DECLARE @ErrorMsg NVARCHAR(100);
+
+    -- Start transaction
+    BEGIN TRANSACTION;
+
+    -- Try block for error handling
+    BEGIN TRY
+        -- Check if the employee exists
+        IF EXISTS (SELECT 1 FROM Employees WHERE EmployeeID = @EmployeeID)
+        BEGIN
+            -- Fetch the current salary for reference
+            SELECT @OldSalary = Salary FROM Employees WHERE EmployeeID = @EmployeeID;
+            
+            -- Update the employee's salary
+            UPDATE Employees
+            SET Salary = @NewSalary
+            WHERE EmployeeID = @EmployeeID;
+
+            -- Check if the update was successful
+            IF @@ROWCOUNT > 0
+            BEGIN
+                -- Commit the transaction
+                COMMIT TRANSACTION;
+                SET @SuccessMessage = 'Employee salary updated successfully from ' 
+                                      + CAST(@OldSalary AS NVARCHAR(50)) + ' to ' 
+                                      + CAST(@NewSalary AS NVARCHAR(50));
+            END
+            ELSE
+            BEGIN
+                -- Rollback if no rows were affected
+                ROLLBACK TRANSACTION;
+                SET @SuccessMessage = 'Salary update failed. No rows affected.';
+            END
+        END
+        ELSE
+        BEGIN
+            -- Employee does not exist
+            ROLLBACK TRANSACTION;
+            SET @SuccessMessage = 'Employee not found. No update performed.';
+        END
+    END TRY
+    -- Catch block to handle errors
+    BEGIN CATCH
+        -- Rollback the transaction if an error occurs
+        ROLLBACK TRANSACTION;
+        -- Fetch the error message
+        SET @ErrorMsg = ERROR_MESSAGE();
+        SET @SuccessMessage = 'Error occurred: ' + @ErrorMsg;
+    END CATCH;
+END;
